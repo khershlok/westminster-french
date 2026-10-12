@@ -1754,6 +1754,12 @@ function render(): void {
   else if(isModule(s)) renderModule(s);
   else renderSkill(s);
   document.title = s ? `${s.en} · French: The Westminster Challenge` : 'French: The Westminster Challenge';
+  // on phones the topic strip scrolls sideways: bring the current topic into view
+  const active = document.querySelector<HTMLElement>('.nav-item.active');
+  const strip = $('navList');
+  if(active && strip.scrollWidth > strip.clientWidth){
+    strip.scrollLeft = active.offsetLeft - (strip.clientWidth - active.offsetWidth) / 2;
+  }
   window.scrollTo(0,0);
 }
 
