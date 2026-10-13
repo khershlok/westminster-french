@@ -92,16 +92,47 @@
   .account .owner-badge{margin:0;}
   .account-link{background:none;border:none;padding:0;color:#B9C3CE;font-size:12.5px;text-decoration:underline;}
   .account-link:hover{color:#fff;}
-  .login-form{margin-top:12px;display:grid;gap:8px;}
-  .login-form input{
-    width:100%;padding:8px 10px;font:inherit;font-size:14px;
-    border:1px solid rgba(255,255,255,0.25);border-radius:4px;
-    background:rgba(255,255,255,0.08);color:#fff;
+
+  /* ---------- Sign-in gate: nothing else shows until the course is unlocked ---------- */
+  body.locked .sidebar, body.locked .main{display:none;}
+  .gate{
+    position:fixed;inset:0;z-index:50;
+    display:grid;place-items:center;padding:16px;
+    background:linear-gradient(160deg, var(--navy) 0%, var(--navy-light) 100%);
   }
-  .login-form input::placeholder{color:#8394A4;}
-  .login-row{display:flex;align-items:center;gap:12px;}
-  .login-form .btn{padding:8px 16px;font-size:14px;}
-  .login-error{margin:0;font-size:12.5px;color:#F0B9BD;}
+  .gate[hidden]{display:none;}
+  .gate-card{
+    width:min(380px, 100%);
+    background:var(--panel);
+    color:var(--ink);
+    border-radius:10px;
+    padding:28px 26px 22px;
+    box-shadow:0 18px 50px rgba(0,0,0,0.35);
+    transition:opacity .25s ease;
+  }
+  .gate-card.pending{opacity:0;pointer-events:none;}
+  .gate-flag{display:flex;height:5px;width:54px;border-radius:2px;overflow:hidden;margin-bottom:16px;}
+  .gate-flag span{flex:1;}
+  .gate-title{
+    font-family:var(--serif);font-style:italic;font-weight:600;
+    font-size:26px;line-height:1.15;margin:0 0 4px;color:var(--navy);
+  }
+  .gate-sub{margin:0 0 20px;font-size:14px;color:var(--ink-soft);}
+  .gate-form{display:grid;gap:12px;}
+  .gate-form label{display:grid;gap:4px;font-size:13px;font-weight:500;color:var(--ink-soft);}
+  .gate-form input{
+    width:100%;padding:10px 12px;font:inherit;font-size:16px;
+    border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--ink);
+  }
+  .gate-form input:focus-visible{outline:2px solid var(--rouge);outline-offset:1px;}
+  .gate-form .btn{justify-content:center;margin-top:4px;padding:12px;}
+  .gate-form .btn[disabled]{opacity:.7;cursor:wait;}
+  .gate-error{margin:0;font-size:13.5px;color:var(--rouge-dark);}
+  .gate-error[hidden]{display:none;}
+  @media (max-width: 600px){
+    .gate-card{padding:22px 20px 18px;}
+    .gate-title{font-size:22px;}
+  }
   .nav-group-label{
     padding:14px 24px 6px;
     font-size:11.5px;
@@ -485,26 +516,34 @@
   }
 </style>
 </head>
-<body>
+<body class="locked">
+
+<section class="gate" id="gate" aria-label="Sign in">
+  <div class="gate-card pending" id="gateCard">
+    <div class="gate-flag" aria-hidden="true"><span style="background:#1C3F94"></span><span style="background:#fff"></span><span style="background:#C8102E"></span></div>
+    <h1 class="gate-title">French: The Westminster Challenge</h1>
+    <p class="gate-sub">Connectez-vous pour commencer — sign in to start.</p>
+    <form class="gate-form" id="gateForm">
+      <label>Username
+        <input id="gateUser" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+      </label>
+      <label>Password
+        <input id="gatePass" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="btn" id="gateBtn">Sign in</button>
+      <p class="gate-error" id="gateError" role="alert" hidden></p>
+    </form>
+  </div>
+</section>
 
 <nav class="sidebar" id="sidebar">
   <div class="brand">
     <p class="brand-title">French: The Westminster Challenge</p>
     <p class="brand-sub">French for the Westminster Challenge — built for Year 8 King's Scholarship prep, not GCSE</p>
     <div class="account">
-      <p class="owner-badge" id="ownerBadge" hidden></p>
-      <button class="account-link" id="signInBtn">Sign in</button>
-      <button class="account-link" id="signOutBtn" hidden>Sign out</button>
+      <p class="owner-badge">Signed in as Shlok Kher</p>
+      <button class="account-link" id="signOutBtn">Sign out</button>
     </div>
-    <form class="login-form" id="loginForm" hidden>
-      <input id="loginUser" type="text" placeholder="Username" autocomplete="username" aria-label="Username">
-      <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password">
-      <div class="login-row">
-        <button type="submit" class="btn">Sign in</button>
-        <button type="button" class="account-link" id="loginCancel">Cancel</button>
-      </div>
-      <p class="login-error" id="loginError" hidden>Wrong username or password.</p>
-    </form>
   </div>
   <div id="navList"></div>
 </nav>
@@ -513,27 +552,125 @@
   <div class="content" id="content"></div>
 </main>
 
-<p id="boot" class="boot">Loading…</p>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <script>
-  // The app is written in TypeScript (app.ts, published beside this page).
-  // Babel strips the types in the browser, then the result runs as a normal script.
-  (async function boot() {
-    const status = document.getElementById("boot");
-    try {
-      const res = await fetch("app.ts");
-      if (!res.ok) throw new Error("app.ts returned " + res.status);
-      const source = await res.text();
-      const js = Babel.transform(source, { filename: "app.ts", presets: ["typescript"] }).code;
-      const script = document.createElement("script");
-      script.textContent = js;
-      document.body.appendChild(script);
-      status.hidden = true;
-    } catch (err) {
-      status.textContent = "Could not start the course: " + err.message;
+// The course is written in TypeScript (src/app.ts, kept off GitHub) and published only as
+// app.enc, encrypted with "username|password". Signing in derives the key with PBKDF2 and
+// decrypts it; Babel then strips the types and the result runs as a normal script.
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const ITERATIONS = 250000;              // must match src/build.sh
+  const MARKER = '// french-course-v1';
+  const KEY_STORE = 'french-unlock';
+  const BABEL = 'https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js';
+  let cipher = null;
+
+  const hex = (u) => Array.from(u, x => x.toString(16).padStart(2, '0')).join('');
+  const unhex = (s) => new Uint8Array(s.match(/../g).map(h => parseInt(h, 16)));
+
+  async function getCipher(){
+    if(cipher) return cipher;
+    const res = await fetch('app.enc', {cache: 'no-cache'});
+    if(!res.ok) throw new Error('The course file is missing (' + res.status + ').');
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if(new TextDecoder().decode(bytes.slice(0, 8)) !== 'Salted__') throw new Error('The course file is damaged.');
+    cipher = {salt: bytes.slice(8, 16), body: bytes.slice(16)};
+    return cipher;
+  }
+  async function deriveBits(pass, salt){
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
+    return new Uint8Array(await crypto.subtle.deriveBits({name: 'PBKDF2', salt, iterations: ITERATIONS, hash: 'SHA-256'}, base, 384));
+  }
+  async function unlock(bits, c){
+    try{
+      const key = await crypto.subtle.importKey('raw', bits.slice(0, 32), {name: 'AES-CBC'}, false, ['decrypt']);
+      const plain = await crypto.subtle.decrypt({name: 'AES-CBC', iv: bits.slice(32, 48)}, key, c.body);
+      const text = new TextDecoder().decode(plain);
+      return text.startsWith(MARKER) ? text : null;
+    }catch(e){
+      return null;
     }
-  })();
+  }
+  function loadBabel(){
+    if(window.Babel) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = BABEL;
+      s.onload = () => res();
+      s.onerror = () => rej(new Error('Could not load the course. Check your internet connection.'));
+      document.head.appendChild(s);
+    });
+  }
+  async function launch(source){
+    await loadBabel();
+    const js = Babel.transform(source, {filename: 'app.ts', presets: ['typescript']}).code;
+    $('gate').hidden = true;
+    document.body.classList.remove('locked');
+    const s = document.createElement('script');
+    s.textContent = js;
+    document.body.appendChild(s);
+  }
+  // Stay signed in on this device: the derived key (not the password) is remembered
+  async function tryRemembered(){
+    let saved = null;
+    try{ saved = localStorage.getItem(KEY_STORE); }catch(e){}
+    if(!saved) return false;
+    try{
+      const [saltHex, bitsHex] = saved.split(':');
+      const c = await getCipher();
+      if(saltHex !== hex(c.salt)) throw new Error('course was updated');
+      const text = await unlock(unhex(bitsHex), c);
+      if(!text) throw new Error('stale');
+      await launch(text);
+      return true;
+    }catch(e){
+      try{ localStorage.removeItem(KEY_STORE); }catch(_){}
+      return false;
+    }
+  }
+  function showError(msg){
+    $('gateError').textContent = msg;
+    $('gateError').hidden = false;
+  }
+
+  $('gateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('gateBtn');
+    $('gateError').hidden = true;
+    if(!window.crypto || !crypto.subtle){ showError('This browser can’t sign in here. Try Safari or Chrome.'); return; }
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    try{
+      const c = await getCipher();
+      const bits = await deriveBits($('gateUser').value.trim() + '|' + $('gatePass').value, c.salt);
+      const text = await unlock(bits, c);
+      if(!text){
+        showError('That username or password isn’t right.');
+        $('gatePass').value = '';
+        $('gatePass').focus();
+      }else{
+        try{ localStorage.setItem(KEY_STORE, hex(c.salt) + ':' + hex(bits)); }catch(_){}
+        await launch(text);
+      }
+    }catch(err){
+      showError(err.message || 'Something went wrong. Please try again.');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    }
+  });
+
+  $('signOutBtn').addEventListener('click', () => {
+    try{ localStorage.removeItem(KEY_STORE); }catch(e){}
+    location.reload();
+  });
+
+  tryRemembered().then(ok => {
+    if(!ok){
+      $('gateCard').classList.remove('pending');
+      $('gateUser').focus({preventScroll: true});
+    }
+  });
+})();
 </script>
 
 </body>

@@ -1,0 +1,3 @@
+# Readable course source and build script stay on this computer only;
+# the site publishes the encrypted app.enc instead.
+src/
